@@ -1,12 +1,13 @@
 version: '1.0'
 kind: step-type
 metadata:
-  name: datarobot/cg-component-pipelines
-  title: Component Pipelines
+  name: datarobot/cg-components
+  title: Components
   version: 0.1.0
   isPublic: false
   description: >-
-    Converts a YAML file of pipelines to run into a codefres-dynamic-pipelines yaml file
+    Takes a list of components, creates the pipelines they've defined,
+    and starts them
   sources:
     - 'https://github.com/carsongee/codefresh_components'
   maintainers:
@@ -24,20 +25,17 @@ metadata:
       https://raw.githubusercontent.com/carsongee/codefresh_components/main/icon-1.svg
     background: '#C7DCFF'
   examples:
-    - description: Start pipelines but don't wait
+    - description: Run component pipelines
       workflow:
-        render_component_pipelines:
-          title: Render yaml suitable for triggering pipelines
-          type: datarobot/cg-component-pipelines
+        run_components:
+          title: Build and Run Component Pipelines
+          type: datarobot/cg-components
           arguments:
-            COMPONENT_PIPELINES: tensorflow/componentA tensorflow/componentB
-            DESTINATION: ${{CF_VOLUME_PATH}}/pipelines.yaml
-        run_cf_pipelines:
-          title: Start pipelines and wait
-          type: codefresh-run-dynamic
-          arguments:
-            RUN_LIST_YAML_FILE: ${{CF_VOLUME_PATH}}/pipelines.yaml
-            WAIT: true
+            components:
+              - componentA
+              - componentB
+            yaml_destination: ${{CF_VOLUME_PATH}}/pipelines.yaml
+            project: tensorflow
   latest: true
 spec:
   arguments: |-
@@ -48,17 +46,22 @@ spec:
         "additionalProperties": false,
         "patterns": [],
         "required": [
-            "COMPONENT_PIPELINES",
-            "DESTINATION"
+            "components",
+            "yaml_destination",
+            "project"
         ],
         "properties": {
-            "COMPONENT_PIPELINES": {
-                "type": "string",
-                "description": "List of Pipeline IDs"
+            "components": {
+                "type": "array",
+                "description": "List of Components"
             },
-            "DESTINATION": {
+            "yaml_destination": {
                 "type": "string",
                 "description": "Path to where to render the file"
+            },
+            "project": {
+                "type": "string",
+                "description": "Project to append pipelines to"
             },
             "DEBUG": {
                 "type": "boolean",
@@ -66,15 +69,35 @@ spec:
             }
         }
     }
-  steps:
+  delimiters:
+    left: '[['
+    right: ']]'
+  stepsTemplate: |-
     main:
-      name: cg-component-pipelines
-      image: carsongee/codefresh_components
+      name: datarobot/cg-components
+      title: Info
+      image: alpine
       commands:
-        - python3 /codefresh_components.py
+        - echo "Running [[ len .Arguments.components ]] component pipelines"
+    [[ range $index, $component := .Arguments.components ]]
+    create_component_pipeline_[[ $index ]]:
+      title: "Make Pipeline for [[ $component ]]"
+      type: pipeline-trigger-merge
+      arguments:
+        SPEC: [[ $component ]]/.cicd/codefresh.yml
+        TRIGGERS: [[ $component ]]/.cicd/trigger.yml
+    [[ end ]]
+    render_component_pipelines:
+      image: carsongee/codefresh_components
       environment:
-        - 'COMPONENT_PIPELINES=${{COMPONENT_PIPELINES}}'
-        - 'DESTINATION=${{DESTINATION}}'
+        - 'COMPONENT_PIPELINES=[[ range $index, $component := .Arguments.components ]][[ $.Arguments.project ]]/[[ $component ]] [[ end ]]'
+        - 'DESTINATION=[[ $.Arguments.yaml_destination ]]'
         - 'CF_BRANCH=${{CF_BRANCH}}'
         - 'CF_REVISION=${{CF_REVISION}}'
-        - 'DEBUG=${{DEBUG}}'
+        - 'DEBUG=[[ $.Arguments.DEBUG ]]'
+    run_component_pipelines:
+      title: Start Pipelines
+      type: codefresh-run-dynamic
+      arguments:
+        RUN_LIST_YAML_FILE: [[ $.Arguments.yaml_destination ]]
+        WAIT: true
