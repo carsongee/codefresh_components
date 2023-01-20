@@ -1,0 +1,79 @@
+version: '1.0'
+kind: step-type
+metadata:
+  name: cg-component-pipelines
+  title: Component Pipelines
+  version: 0.1.0
+  isPublic: false
+  description: >-
+    Converts a YAML file of pipelines to run into a codefres-dynamic-pipelines yaml file
+  sources:
+    - 'https://github.com/carsongee/codefresh_components'
+  maintainers:
+    - name: Carson Gee
+      email: carson.gee@datarobot.com
+  official: false
+  tags:
+    - yaml
+    - call
+    - child
+    - pipeline
+  icon:
+    type: svg
+    url: >-
+      https://github.com/carsongee/codefresh_components/raw/master/icon-1.svg
+    background: '#C7DCFF'
+  examples:
+    - description: Start pipelines but don't wait
+      workflow:
+        render_component_pipelines:
+          title: Render yaml suitable for triggering pipelines
+          type: cg-component-pipelines
+          arguments:
+            COMPONENT_PIPELINES: tensorflow/componentA tensorflow/componentB
+            DESTINATION: ${{CF_VOLUME_PATH}}/pipelines.yaml
+        run_cf_pipelines:
+          title: Start pipelines and wait
+          type: codefresh-run-dynamic
+          arguments:
+            RUN_LIST_YAML_FILE: ${{CF_VOLUME_PATH}}/pipelines.yaml
+            WAIT: true
+  latest: true
+spec:
+  arguments: |-
+    {
+        "definitions": {},
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "additionalProperties": false,
+        "patterns": [],
+        "required": [
+            "COMPONENT_PIPELINES",
+            "DESTINATION"
+        ],
+        "properties": {
+            "COMPONENT_PIPELINES": {
+                "type": "string",
+                "description": "List of Pipeline IDs"
+            },
+            "DESTINATION": {
+                "type": "string",
+                "description": "Path to where to render the file"
+            },
+            "DEBUG": {
+                "type": "boolean",
+                "description": "Set to 'true' to enable debug logging. Default is false."
+            }
+        }
+    }
+  steps:
+    main:
+      name: cg-component-pipelines
+      image: carsongee/codefresh_components
+      commands:
+        - python3 codefresh_components.py
+      environment:
+        - 'COMPONENT_PIPELINES=${{COMPONENT_PIPELINES}}'
+        - 'DESTINATION=${{DESTINATION}}'
+        - 'CF_BRANCH=${{CF_BRANCH}}'
+        - 'CF_REVISION=${{CF_REVISION}}'
