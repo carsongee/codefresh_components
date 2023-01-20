@@ -41,7 +41,7 @@ def render_yaml(
 def main():
     """Entrypoint and input validation"""
 
-    pipelines = env["COMPONENT_PIPELINES"].split()
+    pipelines = env["COMPONENT_PIPELINES"].strip().split()
     destination = Path(env["DESTINATION"])
     branch = env["CF_BRANCH"]
     revision = env["CF_REVISION"]
